@@ -4,6 +4,10 @@ import io.quarkus.hibernate.reactive.panache.Panache;
 import io.quarkus.runtime.StartupEvent;
 import io.smallrye.mutiny.Multi;
 import io.smallrye.mutiny.Uni;
+import io.smallrye.mutiny.tuples.Tuple2;
+import io.vertx.core.file.OpenOptions;
+import io.vertx.mutiny.core.Vertx;
+import io.vertx.mutiny.core.file.AsyncFile;
 import kz.sabyrzhan.orders.Order;
 import kz.sabyrzhan.orders.Product;
 import kz.sabyrzhan.users.UserProfile;
@@ -12,6 +16,7 @@ import javax.enterprise.event.Observes;
 import javax.inject.Inject;
 import javax.ws.rs.*;
 import javax.ws.rs.core.MediaType;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -22,12 +27,14 @@ public class ShopResource {
     private final UserService users;
     private final ProductService products;
     private final OrderService orders;
+    private final Vertx vertx;
 
     @Inject
-    public ShopResource(UserService users, ProductService products, OrderService orders) {
+    public ShopResource(UserService users, ProductService products, OrderService orders, Vertx vertx) {
         this.users = users;
         this.products = products;
         this.orders = orders;
+        this.vertx = vertx;
     }
 
     @POST
@@ -149,5 +156,19 @@ public class ShopResource {
 
         return u.onItem().invoke(userProfile -> System.out.println(userProfile.name + " " + LocalDateTime.now()))
                 .onItem().transform(userProfile -> userProfile.name + " : " + LocalDateTime.now());
+    }
+
+    @GET
+    @Path("/read-chunk")
+    @Produces(MediaType.TEXT_PLAIN)
+    public Multi<String> readChunk() {
+        Multi<Long> tickets = Multi.createFrom().ticks().every(Duration.ofSeconds(1));
+        Multi<String> read = vertx.fileSystem()
+                .open("war-and-peace.txt", new OpenOptions().setRead(true))
+                .onItem().transformToMulti(AsyncFile::toMulti)
+                .onItem().transform(b -> b.toString(StandardCharsets.UTF_8));
+
+        return Multi.createBy().combining().streams(tickets,read).asTuple()
+                .onItem().transform(Tuple2::getItem2);
     }
 }
