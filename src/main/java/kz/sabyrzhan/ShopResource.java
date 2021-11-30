@@ -8,6 +8,7 @@ import io.smallrye.mutiny.tuples.Tuple2;
 import io.vertx.core.file.OpenOptions;
 import io.vertx.mutiny.core.Vertx;
 import io.vertx.mutiny.core.file.AsyncFile;
+import kz.sabyrzhan.messaging.HelloMessaging;
 import kz.sabyrzhan.orders.Order;
 import kz.sabyrzhan.orders.Product;
 import kz.sabyrzhan.users.UserProfile;
@@ -28,13 +29,16 @@ public class ShopResource {
     private final ProductService products;
     private final OrderService orders;
     private final Vertx vertx;
+    private final HelloMessaging helloMessaging;
 
     @Inject
-    public ShopResource(UserService users, ProductService products, OrderService orders, Vertx vertx) {
+    public ShopResource(UserService users, ProductService products, OrderService orders, Vertx vertx,
+                        HelloMessaging helloMessaging) {
         this.users = users;
         this.products = products;
         this.orders = orders;
         this.vertx = vertx;
+        this.helloMessaging = helloMessaging;
     }
 
     @POST
@@ -48,6 +52,7 @@ public class ShopResource {
     @GET
     @Path("/user/{name}")
     public Uni<String> getUser(@PathParam("name") String name) {
+        helloMessaging.sendToUserChannel(1002L);
         Uni<UserProfile> uni = users.getUserByName(name);
         return uni
                 .onItem().transform(user -> user.name)
